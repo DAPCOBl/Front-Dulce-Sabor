@@ -1,10 +1,13 @@
+import AdminHome from './admin/AdminHome'
+import CajeroHome from './cajero/CajeroHome'
+import { isAdministrador } from '../services/auth'
+
 function Home({ session, onLogout }) {
-  return (
-    <div style={{padding:20}}>
-      <h1>Hola, {session.user.nombre}</h1>
-      <button onClick={onLogout}>Cerrar sesion</button>
-    </div>
-  )
+  if (isAdministrador(session)) {
+    return <AdminHome session={session} onLogout={onLogout} />
+  }
+
+  return <CajeroHome session={session} onLogout={onLogout} />
 }
 
 export default Home

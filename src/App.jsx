@@ -1,16 +1,21 @@
 import { useState } from 'react'
 import Login from './pages/Login'
+import Home from './pages/Home'
 import { getSession, logout } from './services/auth'
 
 function App() {
   const [session, setSession] = useState(getSession)
-  if (!session) return <Login onLogin={setSession} />
-  return (
-    <div style={{padding:20}}>
-      <p>Bienvenido, {session.user.nombre}</p>
-      <button onClick={() => { logout(); setSession(null) }}>Salir</button>
-    </div>
-  )
+
+  function handleLogout() {
+    logout()
+    setSession(null)
+  }
+
+  if (!session) {
+    return <Login onLogin={setSession} />
+  }
+
+  return <Home session={session} onLogout={handleLogout} />
 }
 
 export default App
