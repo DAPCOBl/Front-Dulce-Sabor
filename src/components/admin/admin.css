@@ -1071,6 +1071,124 @@
   color: var(--ink);
 }
 
+/* ================= ADMIN · Lotes y vencimiento ================= */
+
+.admin__col-vencimiento {
+  min-width: 150px;
+}
+
+.admin__vencimiento {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
+}
+
+.admin__vencimiento--vencido {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.admin__vencimiento--sin-fecha,
+.admin__vencimiento--sin-lote {
+  color: var(--placeholder);
+}
+
+.admin__vencimiento-cantidad {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+/* Toggle de maneja lotes */
+.admin__toggle-lotes {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--ivory);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.admin__toggle-lotes:hover {
+  border-color: var(--terracotta);
+}
+
+.admin__toggle-lotes--activo {
+  background: color-mix(in srgb, var(--terracotta) 12%, transparent);
+  border-color: var(--terracotta);
+  color: var(--terracotta-dark);
+}
+
+/* Tabla de lotes dentro del editor */
+.admin__tabla-lotes {
+  width: 100%;
+  font-size: 13px;
+}
+
+.admin__tabla-lotes th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--ink-soft);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin__tabla-lotes td {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.admin__lote-fecha {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.admin__lote-fecha--vencida {
+  color: var(--danger);
+}
+
+.admin__col-numero {
+  text-align: right;
+}
+
+.admin__campo--boton-lote {
+  display: flex;
+  align-items: flex-end;
+}
+
+/* POS: producto vencido */
+.producto--vencido {
+  opacity: 0.55;
+  filter: grayscale(0.4);
+}
+
+.producto__vencimiento {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--warning-text);
+  margin-top: 2px;
+}
+
+.producto__vencimiento--vencido {
+  color: var(--danger);
+}
+
+.producto__stock--vencido {
+  color: var(--danger);
+  font-weight: 700;
+}
+
 /* ---------- Impresion / PDF ---------- */
 @page { margin: 18mm; }
 @media print {

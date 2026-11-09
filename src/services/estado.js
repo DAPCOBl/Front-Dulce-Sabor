@@ -127,6 +127,8 @@ export function actualizarProducto(id, cambios) {
         categoria: cambios.categoria ?? item.categoria,
         minimo: cambios.stockMinimo ?? item.minimo,
         enPos: cambios.estado ? cambios.estado === 'Activo' : item.enPos,
+        ...(cambios.manejaLotes !== undefined ? { manejaLotes: cambios.manejaLotes } : {}),
+        ...(cambios.lotes !== undefined ? { lotes: cambios.lotes } : {}),
       }
     }),
   })
@@ -154,6 +156,8 @@ export function crearProducto(producto) {
         stock: producto.stock ?? 0,
         minimo: producto.stockMinimo ?? 0,
         enPos: producto.estado === 'Activo',
+        manejaLotes: producto.manejaLotes ?? false,
+        lotes: producto.lotes ?? null,
       },
       ...estado.inventario,
     ],
@@ -174,15 +178,54 @@ export function generarSku(categoria) {
 
 // Registra una venta cobrada en el punto de venta: la agrega al ledger,
 // descuenta el inventario y suma los ingresos de la sesión.
+// Cuando el producto maneja lotes, descuenta por FIFO de vencimiento
+// (se vende primero el lote que vence primero).
 export function registrarVenta(venta, cajero) {
   const items = venta.items ?? []
 
+  const productosActualizados = estado.productos.map((producto) => {
+    const item = items.find((registro) => registro.id === producto.id)
+    if (!item) return producto
+
+    if (producto.manejaLotes && Array.isArray(producto.lotes)) {
+      let restante = item.cantidad
+      const nuevosLotes = producto.lotes
+        .slice()
+        .sort((a, b) => {
+          const fa = a.fechaVencimiento ? new Date(a.fechaVencimiento).getTime() : Infinity
+          const fb = b.fechaVencimiento ? new Date(b.fechaVencimiento).getTime() : Infinity
+          return fa - fb
+        })
+        .map((lote) => {
+          if (restante <= 0) return lote
+          const disponible = Math.max(lote.cantidad ?? 0, 0)
+          const consumir = Math.min(restante, disponible)
+          restante -= consumir
+          return { ...lote, cantidad: disponible - consumir }
+        })
+
+      return {
+        ...producto,
+        stock: Math.max(producto.stock - item.cantidad, 0),
+        lotes: nuevosLotes,
+      }
+    }
+
+    return { ...producto, stock: Math.max(producto.stock - item.cantidad, 0) }
+  })
+
   actualizar({
     ventas: [{ ...venta, cajero }, ...estado.ventas],
-    productos: estado.productos.map((producto) => {
-      const item = items.find((registro) => registro.id === producto.id)
-      if (!item) return producto
-      return { ...producto, stock: Math.max(producto.stock - item.cantidad, 0) }
+    productos: productosActualizados.map(productoConPrecio),
+    inventario: estado.inventario.map((item) => {
+      const producto = productosActualizados.find((p) => p.id === item.id)
+      if (!producto) return item
+      return {
+        ...item,
+        stock: producto.stock,
+        manejaLotes: producto.manejaLotes ?? false,
+        lotes: producto.lotes ?? null,
+      }
     }),
     sesion: {
       ingresos: estado.sesion.ingresos + venta.importe,
@@ -196,6 +239,98 @@ export function estadoDeInventario(producto) {
   if (producto.stock <= 0) return 'agotado'
   if (producto.stock <= producto.minimo) return 'bajo'
   return 'disponible'
+}
+
+// ---------- Utilidades de lotes y vencimiento ----------
+
+function esFechaValida(fecha) {
+  return Boolean(fecha) && !Number.isNaN(new Date(fecha).getTime())
+}
+
+function fechaISO(fecha) {
+  const d = new Date(fecha)
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
+}
+
+// Cantidad disponible en lotes vigentes (no vencidos) o stock plano si no maneja lotes.
+export function stockDisponible(producto, hoy = new Date()) {
+  if (!producto.manejaLotes || !Array.isArray(producto.lotes)) {
+    return Math.max(producto.stock ?? 0, 0)
+  }
+  const hoyInicio = new Date(hoy)
+  hoyInicio.setHours(0, 0, 0, 0)
+  return producto.lotes
+    .filter((lote) => esFechaValida(lote.fechaVencimiento) && new Date(lote.fechaVencimiento) >= hoyInicio)
+    .reduce((acc, lote) => acc + Math.max(lote.cantidad ?? 0, 0), 0)
+}
+
+// Fecha de vencimiento más cercana entre los lotes del producto.
+export function proximoVencimiento(producto) {
+  if (!producto.manejaLotes || !Array.isArray(producto.lotes) || producto.lotes.length === 0) {
+    return null
+  }
+  const fechas = producto.lotes
+    .filter((lote) => esFechaValida(lote.fechaVencimiento))
+    .map((lote) => new Date(lote.fechaVencimiento))
+  if (fechas.length === 0) return null
+  return fechas.sort((a, b) => a - b)[0]
+}
+
+// ¿Un lote ya venció?
+export function loteEstaVencido(lote, hoy = new Date()) {
+  if (!esFechaValida(lote.fechaVencimiento)) return false
+  const hoyInicio = new Date(hoy)
+  hoyInicio.setHours(0, 0, 0, 0)
+  return new Date(lote.fechaVencimiento) < hoyInicio
+}
+
+// ¿Un lote vence pronto (dentro de los próximos `dias`)?
+export function loteVencePronto(lote, hoy = new Date(), dias = 7) {
+  if (!esFechaValida(lote.fechaVencimiento)) return false
+  const fechaVence = new Date(lote.fechaVencimiento)
+  fechaVence.setHours(0, 0, 0, 0)
+  const hoyInicio = new Date(hoy)
+  hoyInicio.setHours(0, 0, 0, 0)
+  const limite = new Date(hoyInicio)
+  limite.setDate(limite.getDate() + dias)
+  return fechaVence >= hoyInicio && fechaVence <= limite
+}
+
+// Productos con lotes vencidos o por vencer.
+export function alertasDeVencimiento(productos, hoy = new Date(), dias = 7) {
+  const vencidos = []
+  const porVencer = []
+
+  for (const producto of productos) {
+    if (!producto.manejaLotes || !Array.isArray(producto.lotes) || producto.lotes.length === 0) {
+      continue
+    }
+    const tieneVencido = producto.lotes.some((lote) => loteEstaVencido(lote, hoy))
+    const tienePronto = producto.lotes.some((lote) => loteVencePronto(lote, hoy, dias))
+
+    if (tieneVencido) {
+      vencidos.push({
+        id: producto.id,
+        nombre: producto.nombre,
+        sku: producto.sku,
+        lotesVencidos: producto.lotes.filter((lote) => loteEstaVencido(lote, hoy)).length,
+      })
+    } else if (tienePronto) {
+      porVencer.push({
+        id: producto.id,
+        nombre: producto.nombre,
+        sku: producto.sku,
+        proximoVencimiento: fechaISO(proximoVencimiento(producto)),
+      })
+    }
+  }
+
+  vencidos.sort((a, b) => a.nombre.localeCompare(b.nombre))
+  porVencer.sort((a, b) => (a.proximoVencimiento || '').localeCompare(b.proximoVencimiento || ''))
+
+  return { vencidos, porVencer }
 }
 
 function siguienteReferencia(movimientos) {
@@ -214,14 +349,59 @@ function horaCorta(date) {
 
 // Registra un movimiento de inventario: actualiza la existencia del producto
 // (y su equivalente en el punto de venta) y lo deja trazado en el historial.
-export function registrarMovimiento({ productoId, cantidad, tipo, motivo, responsable }) {
+// Cuando `tipo === 'entrada'` y el producto maneja lotes, se puede pasar
+// `loteId` para sumar a un lote existente o `fechaVencimiento` para crear
+// un lote nuevo.
+export function registrarMovimiento({
+  productoId,
+  cantidad,
+  tipo,
+  motivo,
+  responsable,
+  loteId,
+  fechaVencimiento,
+}) {
   const producto = estado.inventario.find((item) => item.id === productoId)
   if (!producto) return null
 
   const unidades = Math.max(Math.round(cantidad), 0)
-  // Una entrada suma al stock; un ajuste fija el conteo físico como nuevo saldo.
-  const nuevoStock = tipo === 'entrada' ? producto.stock + unidades : unidades
   const ahora = new Date()
+
+  let nuevoStock
+  let productosLotes
+
+  if (tipo === 'entrada' && producto.manejaLotes) {
+    // Busca el producto maestro en el catálogo para manipular sus lotes.
+    const maestro = estado.productos.find((item) => item.id === productoId)
+    if (!maestro) return null
+
+    let lotes = maestro.lotes ? [...maestro.lotes] : []
+    let loteEncontrado
+
+    if (loteId) {
+      loteEncontrado = lotes.find((l) => l.id === loteId)
+      if (loteEncontrado) {
+        loteEncontrado = { ...loteEncontrado, cantidad: (loteEncontrado.cantidad ?? 0) + unidades }
+        lotes = lotes.map((l) => (l.id === loteId ? loteEncontrado : l))
+      }
+    }
+
+    if (!loteEncontrado && fechaVencimiento) {
+      const nuevoLote = {
+        id: `lote-${ahora.getTime()}`,
+        fechaVencimiento,
+        cantidad: unidades,
+        fechaEntrada: fechaISO(ahora),
+      }
+      lotes = [...lotes, nuevoLote]
+    }
+
+    productosLotes = lotes
+    nuevoStock = maestro.stock + unidades
+  } else {
+    // Una entrada suma al stock; un ajuste fija el conteo físico como nuevo saldo.
+    nuevoStock = tipo === 'entrada' ? producto.stock + unidades : unidades
+  }
 
   const movimiento = {
     id: `mov-${ahora.getTime()}`,
@@ -235,15 +415,27 @@ export function registrarMovimiento({ productoId, cantidad, tipo, motivo, respon
     saldo: nuevoStock,
     responsable,
     motivo,
+    ...(loteId ? { loteId } : {}),
+    ...(fechaVencimiento ? { fechaVencimiento } : {}),
   }
 
   actualizar({
-    inventario: estado.inventario.map((item) =>
-      item.id === producto.id ? { ...item, stock: nuevoStock } : item,
-    ),
-    productos: estado.productos.map((item) =>
-      item.id === producto.id ? { ...item, stock: nuevoStock } : item,
-    ),
+    inventario: estado.inventario.map((item) => {
+      if (item.id !== producto.id) return item
+      return {
+        ...item,
+        stock: nuevoStock,
+        ...(productosLotes !== undefined ? { lotes: productosLotes } : {}),
+      }
+    }),
+    productos: estado.productos.map((item) => {
+      if (item.id !== producto.id) return item
+      return {
+        ...item,
+        stock: nuevoStock,
+        ...(productosLotes !== undefined ? { lotes: productosLotes } : {}),
+      }
+    }),
     movimientos: [movimiento, ...estado.movimientos],
   })
 

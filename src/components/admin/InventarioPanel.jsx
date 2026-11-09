@@ -13,7 +13,12 @@ const PRODUCTO_INICIAL = 'p13'
 
 function InventarioPanel({ session }) {
   const { inventario, movimientos } = useEstado()
-  const [filtros, setFiltros] = useState({ busqueda: '', categoria: 'todas', estado: 'todos' })
+  const [filtros, setFiltros] = useState({
+    busqueda: '',
+    categoria: 'todas',
+    estado: 'todos',
+    vencimiento: 'todos',
+  })
   const [pagina, setPagina] = useState(1)
   const [productoInicial, setProductoInicial] = useState(PRODUCTO_INICIAL)
   const [modalAbierto, setModalAbierto] = useState(false)

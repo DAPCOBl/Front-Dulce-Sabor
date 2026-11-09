@@ -100,6 +100,11 @@ export const PRODUCTOS_CATALOGO = [
     stockMinimo: 6,
     estado: 'Activo',
     imagen: '/productos/Torta de chocolate.png',
+    manejaLotes: true,
+    lotes: [
+      { id: 'lote-p7-1', fechaVencimiento: '2026-11-10', cantidad: 2, fechaEntrada: '2026-10-20' },
+      { id: 'lote-p7-2', fechaVencimiento: '2026-11-20', cantidad: 2, fechaEntrada: '2026-10-22' },
+    ],
   },
   {
     id: 'p24',
@@ -112,6 +117,8 @@ export const PRODUCTOS_CATALOGO = [
     stockMinimo: 3,
     estado: 'Activo',
     imagen: '/productos/Tarta de Fresa.png',
+    manejaLotes: true,
+    lotes: [],
   },
   {
     id: 'i04',
@@ -124,6 +131,11 @@ export const PRODUCTOS_CATALOGO = [
     stockMinimo: 4,
     estado: 'Activo',
     imagen: '/productos/Tarta de Fresa.png',
+    manejaLotes: true,
+    lotes: [
+      { id: 'lote-i04-1', fechaVencimiento: '2026-10-28', cantidad: 3, fechaEntrada: '2026-10-21' },
+      { id: 'lote-i04-2', fechaVencimiento: '2026-11-05', cantidad: 4, fechaEntrada: '2026-10-23' },
+    ],
   },
   {
     id: 'i05',
@@ -148,6 +160,10 @@ export const PRODUCTOS_CATALOGO = [
     stockMinimo: 4,
     estado: 'Activo',
     imagen: '/productos/Torta de chocolate.png',
+    manejaLotes: true,
+    lotes: [
+      { id: 'lote-i06-1', fechaVencimiento: '2026-11-02', cantidad: 5, fechaEntrada: '2026-10-24' },
+    ],
   },
   {
     id: 'i07',

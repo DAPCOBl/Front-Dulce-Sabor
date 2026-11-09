@@ -15,6 +15,8 @@ export const INVENTARIO = PRODUCTOS_CATALOGO.map((producto) => ({
   stock: producto.stock,
   minimo: producto.stockMinimo,
   enPos: producto.estado === 'Activo',
+  manejaLotes: producto.manejaLotes ?? false,
+  lotes: producto.lotes ?? null,
 }))
 
 // Motivos que justifican cada tipo de movimiento.

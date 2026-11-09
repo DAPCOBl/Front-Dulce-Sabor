@@ -16,6 +16,7 @@ import {
   IconArrow,
   IconSales,
   IconTendenciaUp,
+  IconWarning,
 } from '../../components/ui/icons'
 import { SECCIONES } from '../../components/admin/secciones'
 import {
@@ -33,7 +34,11 @@ import {
   RESUMEN_MES,
   SERIE_SEMANAL,
 } from '../../data/admin'
-import { alertasDeInventario, useEstado } from '../../services/estado'
+import {
+  alertasDeInventario,
+  alertasDeVencimiento,
+  useEstado,
+} from '../../services/estado'
 import '../../components/admin/admin.css'
 
 function AdminHome({ session, onLogout }) {
@@ -77,6 +82,9 @@ function AdminHome({ session, onLogout }) {
   const alertas = useMemo(() => alertasDeInventario(productos), [productos])
   const agotados = alertas.filter((alerta) => alerta.estado === 'agotado').length
   const stockBajo = alertas.length - agotados
+
+  const vencimiento = useMemo(() => alertasDeVencimiento(productos), [productos])
+  const totalVencimiento = vencimiento.vencidos.length + vencimiento.porVencer.length
 
   const seccion = SECCIONES.find((item) => item.id === vista) ?? SECCIONES[0]
   const IconoSeccion = seccion.Icono
@@ -160,6 +168,25 @@ function AdminHome({ session, onLogout }) {
                     </span>
                   }
                 />
+
+                {totalVencimiento > 0 && (
+                  <Kpi
+                    etiqueta="Por vencer"
+                    valor={totalVencimiento}
+                    unidad="PRODUCTOS"
+                    icono={<IconWarning width="17" height="17" />}
+                    meta={
+                      <span className="admin__kpi-linea">
+                        <span className="ui__tendencia ui__tendencia--alerta">
+                          {vencimiento.vencidos.length} vencido
+                        </span>
+                        <span className="ui__tendencia ui__tendencia--baja">
+                          {vencimiento.porVencer.length} pronto
+                        </span>
+                      </span>
+                    }
+                  />
+                )}
               </section>
 
               <section className="admin__fila">

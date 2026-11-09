@@ -4,6 +4,7 @@ import Vacio from '../ui/Vacio'
 import { Select } from '../ui/Filtro'
 import { IconClose, IconDesactivar, IconEditar } from '../ui/icons'
 import { moneda } from '../ui/format'
+import { proximoVencimiento, loteEstaVencido } from '../../services/estado'
 
 const OPCIONES_CATEGORIA = [{ valor: '', etiqueta: 'Todas las categorías' }]
 
@@ -92,6 +93,9 @@ function ProductosTabla({
                   Coste
                 </th>
                 <th scope="col">Estado</th>
+                <th scope="col" className="admin__col-vencimiento">
+                  Vencimiento
+                </th>
                 <th scope="col" className="admin__col-acciones">
                   Acciones
                 </th>
@@ -123,6 +127,33 @@ function ProductosTabla({
                         <span className="admin__estado-punto" />
                         {producto.estado}
                       </span>
+                    </td>
+                    <td className="admin__col-vencimiento">
+                      {producto.manejaLotes && Array.isArray(producto.lotes) && producto.lotes.length > 0 ? (
+                        <>
+                          {proximoVencimiento(producto) ? (
+                            <span
+                              className={`admin__vencimiento${
+                                producto.lotes.some((l) => loteEstaVencido(l))
+                                  ? ' admin__vencimiento--vencido'
+                                  : ''
+                              }`}>
+                              {proximoVencimiento(producto)?.toLocaleDateString('es-CO', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              })}
+                            </span>
+                          ) : (
+                            <span className="admin__vencimiento admin__vencimiento--sin-fecha">Sin fecha</span>
+                          )}
+                          <span className="admin__vencimiento-cantidad">
+                            {producto.lotes.reduce((acc, l) => acc + (l.cantidad ?? 0), 0)} ud.
+                          </span>
+                        </>
+                      ) : (
+                        <span className="admin__vencimiento admin__vencimiento--sin-lote">—</span>
+                      )}
                     </td>
                     <td className="admin__col-acciones">
                       <div className="admin__acciones-fila">

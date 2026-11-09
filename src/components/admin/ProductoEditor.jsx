@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { generarSku } from '../../services/estado'
+import { generarSku, stockDisponible, loteEstaVencido } from '../../services/estado'
 import Modal from '../ui/Modal'
-import { IconInfo } from '../ui/icons'
+import { IconInfo, IconTrash, IconPlus } from '../ui/icons'
 
 const TITULOS = {
   editar: 'Editar producto',
@@ -19,8 +19,9 @@ function valoresIniciales(producto) {
       coste: '',
       stockMinimo: '',
       estado: 'Activo',
-       imagen: '',
-
+      manejaLotes: false,
+      lotes: [],
+      imagen: '',
     }
   }
 
@@ -32,8 +33,9 @@ function valoresIniciales(producto) {
     coste: String(producto.coste ?? 0),
     stockMinimo: String(producto.stockMinimo),
     estado: producto.estado,
-     imagen: producto.imagen ?? '',
-
+    manejaLotes: Boolean(producto.manejaLotes),
+    lotes: Array.isArray(producto.lotes) ? [...producto.lotes] : [],
+    imagen: producto.imagen ?? '',
   }
 }
 
@@ -51,8 +53,48 @@ function ProductoEditor({
   const [errores, setErrores] = useState({})
   const [guardado, setGuardado] = useState(false)
   const [skuEditado, setSkuEditado] = useState(Boolean(producto))
+  const [nuevoLote, setNuevoLote] = useState({ fechaVencimiento: '', cantidad: '' })
 
   const soloLectura = modo === 'ver'
+
+  function toggleManejaLotes() {
+    setForm((actual) => ({ ...actual, manejaLotes: !actual.manejaLotes }))
+  }
+
+  function actualizarNuevoLote(campo, valor) {
+    setNuevoLote((actual) => ({ ...actual, [campo]: valor }))
+  }
+
+  function agregarLote() {
+    const fecha = nuevoLote.fechaVencimiento.trim()
+    const cantidad = Number(nuevoLote.cantidad) || 0
+    if (!fecha || cantidad <= 0) return
+
+    setForm((actual) => ({
+      ...actual,
+      lotes: [
+        ...actual.lotes,
+        {
+          id: `lote-${Date.now()}`,
+          fechaVencimiento: fecha,
+          cantidad,
+          fechaEntrada: new Date().toISOString().slice(0, 10),
+        },
+      ],
+    }))
+    setNuevoLote({ fechaVencimiento: '', cantidad: '' })
+  }
+
+  function eliminarLote(id) {
+    setForm((actual) => ({
+      ...actual,
+      lotes: actual.lotes.filter((lote) => lote.id !== id),
+    }))
+  }
+
+  function totalLotes() {
+    return form.lotes.reduce((acc, lote) => acc + (lote.cantidad ?? 0), 0)
+  }
 
   useEffect(() => {
     if (!guardado) return
@@ -123,6 +165,8 @@ function ProductoEditor({
       coste: Number(form.coste),
       stockMinimo: Number(form.stockMinimo),
       estado: form.estado,
+      manejaLotes: form.manejaLotes,
+      lotes: form.lotes,
        imagen: form.imagen,
 
     })
@@ -136,7 +180,10 @@ function ProductoEditor({
     onCancelar()
   }
 
-  const existencias = producto?.stock ?? 0
+  const manejaLotesProducto = Boolean(producto?.manejaLotes)
+  const existencias = manejaLotesProducto && producto
+    ? stockDisponible(producto)
+    : producto?.stock ?? 0
   const minimo = producto?.stockMinimo ?? 0
   const precio = Number(form.precio) || 0
   const coste = Number(form.coste) || 0
@@ -352,6 +399,131 @@ function ProductoEditor({
             ))}
           </select>
         </div>
+
+        <div className="admin__campo">
+          <label className="admin__campo-label" htmlFor="producto-maneja-lotes">
+            Manejar lotes con fecha de vencimiento
+          </label>
+          <button
+            id="producto-maneja-lotes"
+            type="button"
+            className={`admin__toggle-lotes${form.manejaLotes ? ' admin__toggle-lotes--activo' : ''}`}
+            onClick={toggleManejaLotes}
+            disabled={soloLectura}
+            aria-pressed={form.manejaLotes}
+          >
+            {form.manejaLotes ? 'Activado' : 'Desactivado'}
+          </button>
+          {form.manejaLotes && (
+            <p className="admin__aviso-texto" style={{ marginTop: 8, fontSize: 13, color: 'var(--ink-soft)' }}>
+              Registra cada lote con su fecha de vencimiento para controlar el stock disponible y recibir alertas.
+            </p>
+          )}
+        </div>
+
+        {form.manejaLotes && (
+          <>
+            <div className="admin__campo">
+              <label className="admin__campo-label">Lotes registrados</label>
+              {form.lotes.length === 0 ? (
+                <p className="admin__aviso-texto" style={{ margin: 0, fontSize: 13, color: 'var(--ink-soft)' }}>
+                  Sin lotes registrados.
+                </p>
+              ) : (
+                <table className="ui__tabla admin__tabla-lotes">
+                  <thead>
+                    <tr>
+                      <th>Vencimiento</th>
+                      <th className="admin__col-numero">Cantidad</th>
+                      <th className="admin__col-numero">Entrada</th>
+                      <th className="admin__col-acciones">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {form.lotes.map((lote) => (
+                      <tr key={lote.id}>
+                        <td className={`admin__lote-fecha${loteEstaVencido(lote) ? ' admin__lote-fecha--vencida' : ''}`}>
+                          {new Date(lote.fechaVencimiento).toLocaleDateString('es-CO', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                          })}
+                        </td>
+                        <td className="admin__col-numero">{lote.cantidad}</td>
+                        <td className="admin__col-numero">{lote.fechaEntrada || '-'}</td>
+                        <td className="admin__col-acciones">
+                          <button
+                            type="button"
+                            className="admin__accion admin__accion--eliminar-lote"
+                            onClick={() => eliminarLote(lote.id)}
+                            disabled={soloLectura}
+                            aria-label={`Eliminar lote ${lote.id}`}
+                          >
+                            <IconTrash width="16" height="16" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="admin__campo-par">
+              <div className="admin__campo">
+                <label className="admin__campo-label" htmlFor="producto-lote-fecha">
+                  Fecha de vencimiento
+                </label>
+                <input
+                  id="producto-lote-fecha"
+                  className={`admin__input${errores.loteFecha ? ' admin__input--error' : ''}`}
+                  type="date"
+                  value={nuevoLote.fechaVencimiento}
+                  onChange={(evento) => actualizarNuevoLote('fechaVencimiento', evento.target.value)}
+                  disabled={soloLectura}
+                  aria-invalid={Boolean(errores.loteFecha)}
+                />
+                {errores.loteFecha && <p className="admin__campo-error">{errores.loteFecha}</p>}
+              </div>
+
+              <div className="admin__campo">
+                <label className="admin__campo-label" htmlFor="producto-lote-cantidad">
+                  Cantidad (unidades)
+                </label>
+                <input
+                  id="producto-lote-cantidad"
+                  className={`admin__input${errores.loteCantidad ? ' admin__input--error' : ''}`}
+                  type="number"
+                  min="1"
+                  value={nuevoLote.cantidad}
+                  onChange={(evento) => actualizarNuevoLote('cantidad', evento.target.value)}
+                  disabled={soloLectura}
+                  aria-invalid={Boolean(errores.loteCantidad)}
+                  placeholder="0"
+                />
+                {errores.loteCantidad && <p className="admin__campo-error">{errores.loteCantidad}</p>}
+              </div>
+
+              <div className="admin__campo admin__campo--boton-lote">
+                <button
+                  type="button"
+                  className="ui__boton ui__boton--primario ui__boton--ancho"
+                  onClick={agregarLote}
+                  disabled={soloLectura || !nuevoLote.fechaVencimiento || Number(nuevoLote.cantidad) <= 0}
+                >
+                  <IconPlus width="17" height="17" /> Agregar lote
+                </button>
+              </div>
+            </div>
+
+            <div className="admin__campo">
+              <label className="admin__campo-label">Total en lotes</label>
+              <p className="admin__aviso-texto" style={{ margin: 0, fontWeight: 600 }}>
+                {totalLotes()} unidades
+              </p>
+            </div>
+          </>
+        )}
 
         <div className="admin__aviso">
           <span className="admin__aviso-icono">

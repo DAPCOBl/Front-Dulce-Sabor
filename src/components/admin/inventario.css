@@ -98,6 +98,34 @@
   text-align: center;
 }
 
+/* ---------- Columna de vencimiento en inventario ---------- */
+
+.admin__col-vencimiento {
+  min-width: 150px;
+}
+
+.admin__vencimiento {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
+}
+
+.admin__vencimiento--vencido {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.admin__vencimiento--sin-fecha,
+.admin__vencimiento--sin-lote {
+  color: var(--placeholder);
+}
+
+.admin__vencimiento-cantidad {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
 /* ---------- Paginación ---------- */
 
 .admin__paginacion {

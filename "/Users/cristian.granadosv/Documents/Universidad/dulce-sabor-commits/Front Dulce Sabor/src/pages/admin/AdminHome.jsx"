@@ -1,0 +1,9 @@
+  const alertas = useMemo(() => alertasDeInventario(productos), [productos])
+  const agotados = alertas.filter((alerta) => alerta.estado === 'agotado').length
+  const stockBajo = alertas.length - agotados
+
+  const vencimiento = useMemo(
+    () => alertasDeVencimiento(productos),
+    [productos],
+  )
+  const totalVencimiento = vencimiento.vencidos.length + vencimiento.porVencer.length

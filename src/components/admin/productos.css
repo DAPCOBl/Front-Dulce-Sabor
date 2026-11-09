@@ -129,6 +129,14 @@
   white-space: nowrap;
 }
 
+.admin__col-vencimiento {
+  min-width: 160px;
+}
+
+.admin__col-numero {
+  text-align: right;
+}
+
 .admin__catalogo .admin__producto {
   display: flex;
   flex-direction: row;

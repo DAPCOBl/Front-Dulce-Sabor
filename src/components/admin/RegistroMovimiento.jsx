@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import Modal from '../ui/Modal'
 import { IconArrow, IconInfo, IconSuccess } from '../ui/icons'
-import { MOTIVOS_AJUSTE, MOTIVOS_ENTRADA, RESPONSABLES_INVENTARIO } from '../../data/inventario'
+import {
+  MOTIVOS_AJUSTE,
+  MOTIVOS_ENTRADA,
+  RESPONSABLES_INVENTARIO,
+} from '../../data/inventario'
 
 const CANTIDAD_INICIAL = 12
 
@@ -18,6 +22,7 @@ function RegistroMovimiento({
   const [cantidad, setCantidad] = useState(CANTIDAD_INICIAL)
   const [motivo, setMotivo] = useState(MOTIVOS_ENTRADA[0])
   const [responsable, setResponsable] = useState(session.user.nombre)
+  const [fechaVencimiento, setFechaVencimiento] = useState('')
   const [exito, setExito] = useState(null)
 
   const campoProductoRef = useRef(null)
@@ -27,6 +32,7 @@ function RegistroMovimiento({
   }, [])
 
   const producto = productos.find((item) => item.id === productoId) ?? productos[0]
+  const manejaLotes = Boolean(producto?.manejaLotes)
   const stockActual = producto?.stock ?? 0
   const unidades = Math.max(Math.round(Number(cantidad) || 0), 0)
   const nuevoStock = tipo === 'entrada' ? stockActual + unidades : unidades
@@ -36,6 +42,7 @@ function RegistroMovimiento({
     setTipo(siguiente)
     setMotivo(siguiente === 'entrada' ? MOTIVOS_ENTRADA[0] : MOTIVOS_AJUSTE[0])
     setCantidad(siguiente === 'entrada' ? CANTIDAD_INICIAL : stockActual)
+    setFechaVencimiento('')
     setExito(null)
   }
 
@@ -52,6 +59,9 @@ function RegistroMovimiento({
       tipo,
       motivo,
       responsable,
+      ...(manejaLotes && tipo === 'entrada' && fechaVencimiento
+        ? { fechaVencimiento }
+        : {}),
     })
 
     if (!movimiento) return
@@ -154,6 +164,19 @@ function RegistroMovimiento({
           </select>
         </label>
 
+        {manejaLotes && tipo === 'entrada' && (
+          <label className="admin__campo">
+            <span className="admin__campo-label">Fecha de vencimiento del lote</span>
+            <input
+              className="admin__control"
+              type="date"
+              value={fechaVencimiento}
+              onChange={(evento) => setFechaVencimiento(evento.target.value)}
+              required
+            />
+          </label>
+        )}
+
         <label className="admin__campo">
           <span className="admin__campo-label">Responsable</span>
           <select
@@ -193,6 +216,15 @@ function RegistroMovimiento({
             <span>
               {exito.referencia} registrada: {exito.producto} pasó de {exito.stockAnterior} a{' '}
               {exito.saldo} unidades.
+              {exito.fechaVencimiento && (
+                <>
+                  <br />
+                  Lote con vencimiento {new Date(exito.fechaVencimiento).toLocaleDateString(
+                    'es-CO',
+                    { day: '2-digit', month: '2-digit', year: 'numeric' },
+                  )}
+                </>
+              )}
             </span>
           </p>
         ) : (
@@ -201,6 +233,13 @@ function RegistroMovimiento({
             <span>
               El movimiento queda trazado con hora, referencia y responsable. Las
               entradas se reflejan de inmediato en el punto de venta.
+              {manejaLotes && tipo === 'entrada' && (
+                <>
+                  <br />
+                  Si el producto maneja lotes, la fecha de vencimiento se guarda con
+                  la entrada.
+                </>
+              )}
             </span>
           </p>
         )}
